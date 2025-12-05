@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'core.apps.CoreConfig',
     'rest_framework',
     'phonenumber_field',
+    'debug_toolbar',
 ]
 
 MIDDLEWARE = [
@@ -51,6 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -71,6 +73,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
 
 
 # Database
