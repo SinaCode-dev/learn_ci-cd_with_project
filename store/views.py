@@ -13,6 +13,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet, ModelViewSet, 
 from .models import Application, Customer, Service, Comment, Cart, CartItem, Order, OrderItem, Discount
 from .serializers import AddCartItemSerializer, ApplicationSerializer, CustomerSerializer, OrderCreateSerializer, OrderForAdminSerializer, ServiceSerializer, CommentSerializer, CartSerializer, CartItemSerializer, OrderSerializer, OrderItemSerializer, DiscountSerializer, UpdateCartItemSerializer
 from .permissions import IsAdminOrReadOnly, IsCommentAuthorOrAdmin
+from .paginations import DefaultPagination
 
 
 
@@ -20,6 +21,7 @@ class ApplicationViewSet(ModelViewSet):
     serializer_class = ApplicationSerializer
     queryset = Application.objects.all()
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = DefaultPagination
 
     def initialize_request(self, request, *args, **kwargs):
         request = super().initialize_request(request, *args, **kwargs)
@@ -34,6 +36,7 @@ class ServiceViewSet(ModelViewSet):
     serializer_class = ServiceSerializer
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = DefaultPagination
     
     def get_queryset(self):
         application_pk = self.kwargs["application_pk"]
@@ -54,6 +57,7 @@ class ServiceViewSet(ModelViewSet):
 
 class CommentViewSet(ModelViewSet):
     serializer_class = CommentSerializer
+    pagination_class = DefaultPagination
     
     def get_queryset(self):
         application_pk = self.kwargs["application_pk"]
@@ -98,6 +102,7 @@ class CartItemViewSet(ModelViewSet):
 
 class OrderViewSet(ModelViewSet):
     http_method_names = ['get', 'post', 'head', 'options']
+    pagination_class = DefaultPagination
 
     def get_permissions(self):
         return [IsAuthenticated()]
@@ -165,6 +170,7 @@ class DiscountServicesViewSet(ModelViewSet):
     serializer_class = ServiceSerializer
     http_method_names = ["get"]
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = DefaultPagination
 
     def get_queryset(self):
         discount_pk = self.kwargs["discount_pk"]
@@ -175,12 +181,18 @@ class CustomerViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = CustomerSerializer
     queryset = Customer.objects.all()
+    pagination_class = DefaultPagination
 
     def list(self, request):
         if request.user.is_staff:
             queryset = Customer.objects.all()
         else:
             queryset = Customer.objects.filter(user=request.user)
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
