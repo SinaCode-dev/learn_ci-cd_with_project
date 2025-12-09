@@ -6,23 +6,34 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, GenericViewSet, ModelViewSet, ReadOnlyModelViewSet, ViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 
 from .models import Application, Customer, Service, Comment, Cart, CartItem, Order, OrderItem, Discount
 from .serializers import AddCartItemSerializer, ApplicationSerializer, CustomerSerializer, OrderCreateSerializer, OrderForAdminSerializer, ServiceSerializer, CommentSerializer, CartSerializer, CartItemSerializer, OrderSerializer, OrderItemSerializer, DiscountSerializer, UpdateCartItemSerializer
+from .permissions import IsAdminOrReadOnly, IsCommentAuthorOrAdmin
 
 
 
 class ApplicationViewSet(ModelViewSet):
     serializer_class = ApplicationSerializer
     queryset = Application.objects.all()
+    permission_classes = [IsAdminOrReadOnly]
+
+    def initialize_request(self, request, *args, **kwargs):
+        request = super().initialize_request(request, *args, **kwargs)
+        if not request.user.is_authenticated or not request.user.is_staff:
+            self.http_method_names = ['get', 'head', 'options']
+        else:
+            self.http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
+        return request
 
 
 class ServiceViewSet(ModelViewSet):
     serializer_class = ServiceSerializer
     parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAdminOrReadOnly]
     
     def get_queryset(self):
         application_pk = self.kwargs["application_pk"]
@@ -31,11 +42,18 @@ class ServiceViewSet(ModelViewSet):
     def perform_create(self, serializer):
         application = get_object_or_404(Application, pk=self.kwargs['application_pk'])
         serializer.save(application=application)
+    
+    def initialize_request(self, request, *args, **kwargs):
+        request = super().initialize_request(request, *args, **kwargs)
+        if not request.user.is_authenticated or not request.user.is_staff:
+            self.http_method_names = ['get', 'head', 'options']
+        else:
+            self.http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
+        return request
 
 
 class CommentViewSet(ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         application_pk = self.kwargs["application_pk"]
@@ -45,6 +63,11 @@ class CommentViewSet(ModelViewSet):
     def perform_create(self, serializer):
         service = get_object_or_404(Service, pk=self.kwargs['service_pk'])
         serializer.save(author=self.request.user, service=service)
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsCommentAuthorOrAdmin()]
 
 
 class CartViewSet(CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, GenericViewSet):
@@ -59,6 +82,7 @@ class CartItemViewSet(ModelViewSet):
 
     def get_queryset(self):
         cart_pk = self.kwargs["cart_pk"]
+        get_object_or_404(Cart, pk=cart_pk)
         return CartItem.objects.select_related('service').filter(cart_id=cart_pk).all()
 
     def get_serializer_class(self):
@@ -97,7 +121,7 @@ class OrderViewSet(ModelViewSet):
         return OrderSerializer
 
     def get_serializer_context(self):
-        return {"user": self.request.user}
+        return {"user": self.request.user, "request": self.request}
 
     def create(self, request, *args, **kwargs):
         customer = Customer.objects.get(user=request.user)
@@ -124,6 +148,7 @@ class OrderViewSet(ModelViewSet):
 
 class OrderItemsViewSet(ReadOnlyModelViewSet):
     serializer_class = OrderItemSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         order_pk = self.kwargs["order_pk"]
@@ -133,11 +158,13 @@ class OrderItemsViewSet(ReadOnlyModelViewSet):
 class DiscountViewSet(ModelViewSet):
     serializer_class = DiscountSerializer
     queryset = Discount.objects.all()
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class DiscountServicesViewSet(ModelViewSet):
     serializer_class = ServiceSerializer
     http_method_names = ["get"]
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         discount_pk = self.kwargs["discount_pk"]
