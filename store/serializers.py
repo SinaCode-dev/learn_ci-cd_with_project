@@ -20,6 +20,18 @@ class ApplicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = ["title", "description", "top_service"]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance:
+            self.fields['top_service'].read_only = True
+        elif isinstance(self.instance, Application):
+            self.fields['top_service'].queryset = self.instance.services.all()
+    
+    def validate_top_service(self, value):
+        if value and self.instance and value.application != self.instance:
+            raise serializers.ValidationError("The selected premium service must belong to this application.")
+        return value
 
 
 class ServiceFieldSerializer(serializers.ModelSerializer):
