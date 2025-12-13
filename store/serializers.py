@@ -228,6 +228,7 @@ class OrderSerializer(serializers.ModelSerializer):
     total_order_price = serializers.SerializerMethodField()
     payment_authority = serializers.CharField(read_only=True)
     payment_ref_id = serializers.CharField(read_only=True)
+    customer = serializers.StringRelatedField()
 
     class Meta:
         model = Order

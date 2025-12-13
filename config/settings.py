@@ -12,21 +12,30 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
+import environ
+import os
+
+env = environ.Env(
+    DEBUG=(bool, False),
+    ALLOWED_HOSTS=(list, []),
+    ZARINPAL_SANDBOX=(bool, True),
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-nwjo5u*)rzh*=k$w!$dntkw@%lf)ajs9o-yeapnh)x$a%gfwam'
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
 
 # Application definition
@@ -88,8 +97,12 @@ INTERNAL_IPS = [
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': env('POSTGRES_ENGINE', default='django.db.backends.sqlite3'),
+        'NAME': env('POSTGRES_DB'),
+        'USER': env('POSTGRES_USER'),
+        'PASSWORD': env('POSTGRES_PASSWORD'),
+        'HOST': env('POSTGRES_HOST', default='db'),
+        'PORT': env('POSTGRES_PORT', default='5432'),
     }
 }
 
@@ -158,22 +171,21 @@ DJOSER = {
     'TOKEN_MODEL': None,
 }
 
-ZARINPAL_MERCHANT_ID = '00000000-0000-0000-0000-000000000000'
-ZARINPAL_SANDBOX = True
-ZARINPAL_REQUEST_URL = 'https://sandbox.zarinpal.com/pg/v4/payment/request.json'
-ZARINPAL_VERIFY_URL = 'https://sandbox.zarinpal.com/pg/v4/payment/verify.json'
-ZARINPAL_START_PAY_URL = 'https://sandbox.zarinpal.com/pg/StartPay/'
-ZARINPAL_CALLBACK_URL = 'http://127.0.0.1:8000/orders/{order_id}/callback/'
+ZARINPAL_MERCHANT_ID = env('ZARINPAL_MERCHANT_ID')
+ZARINPAL_SANDBOX = env('ZARINPAL_SANDBOX')
+ZARINPAL_REQUEST_URL = env('ZARINPAL_REQUEST_URL')
+ZARINPAL_VERIFY_URL = env('ZARINPAL_VERIFY_URL')
+ZARINPAL_START_PAY_URL = env('ZARINPAL_START_PAY_URL')
+ZARINPAL_CALLBACK_URL = env('ZARINPAL_CALLBACK_URL')
 
 
 
-KAVENEGAR_API_KEY = 'HERE_YOU_SHOULD_PASTE_YOUR_OWN_APIKEY'
-KAVENEGAR_SENDER = 'HERE_YOU_SHOULD_PASTE_YOUR_OWN_SENDER'
+KAVENEGAR_API_KEY = env('KAVENEGAR_API_KEY')
+KAVENEGAR_SENDER = env('KAVENEGAR_SENDER')
 
-
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
+CELERY_BROKER_URL = env('CELERY_BROKER_URL')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
+CELERY_ACCEPT_CONTENT = [env('CELERY_ACCEPT_CONTENT')]
+CELERY_TASK_SERIALIZER = env('CELERY_TASK_SERIALIZER')
+CELERY_RESULT_SERIALIZER = env('CELERY_RESULT_SERIALIZER')
+CELERY_TIMEZONE = env('CELERY_TIMEZONE')

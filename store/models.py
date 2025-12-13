@@ -54,7 +54,7 @@ class Service(models.Model):
     image = models.ImageField(upload_to='services/images/', null=True, blank=True, default='services/images/default_service.jpg')
     slug = models.SlugField()
     description = models.TextField()
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=0)
     datetime_created = models.DateTimeField(auto_now_add=True)
     datetime_modified = models.DateTimeField(auto_now=True)
     discounts = models.ForeignKey(Discount, null=True, blank=True, on_delete=models.SET_NULL)
@@ -131,7 +131,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="items")
     service = models.ForeignKey(Service, on_delete=models.PROTECT)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=0)
     quantity = models.PositiveSmallIntegerField(default=1)
     extra_data = models.JSONField(default=dict, blank=True, null=True)
 
