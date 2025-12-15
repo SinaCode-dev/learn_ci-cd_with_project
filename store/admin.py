@@ -17,7 +17,7 @@ class ServiceInline(admin.TabularInline):
 
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
-    list_display = ["title", "description", "top_service"]
+    list_display = ["title", "short_description", "top_service"]
     inlines = [ServiceInline]
     readonly_fields = ("image_preview",)
 
@@ -30,7 +30,7 @@ class ApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):
-    list_display = ["discount_percent", "name"]
+    list_display = ["name", "discount_percent"]
 
 
 class CommentsInline(admin.TabularInline):
@@ -41,6 +41,7 @@ class CommentsInline(admin.TabularInline):
 @admin.register(ServiceField)
 class ServiceFieldAdmin(admin.ModelAdmin):
     list_display = ["service", "field_name", "field_type", "is_required", "label"]
+    readonly_fields = ("is_required",)
 
 
 class ServiceFieldInline(admin.TabularInline):
@@ -50,7 +51,7 @@ class ServiceFieldInline(admin.TabularInline):
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ["name", "application", "description", "price", "datetime_created", "discounts", "image"]
+    list_display = ["name", "application", "short_description", "price", "datetime_created", "discounts", "image"]
     inlines = [CommentsInline, ServiceFieldInline]
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("datetime_created", "image_preview")
@@ -64,7 +65,7 @@ class ServiceAdmin(admin.ModelAdmin):
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ["author", "service", "body", "status", "datetime_created"]
+    list_display = ["author", "service", "short_body", "status", "datetime_created"]
 
 
 class CartItemInline(admin.TabularInline):
@@ -98,7 +99,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    list_display = ["order", "service", "quantity", "price", "extra_data_preview"]
+    list_display = ["formatted_order", "service", "quantity", "price", "extra_data_preview"]
 
     def extra_data_preview(self, obj):
         if not obj.extra_data:
@@ -109,4 +110,10 @@ class OrderItemAdmin(admin.ModelAdmin):
             label = field.label if field and field.label else k
             items.append(f"{label}: {v}")
         return mark_safe("<br>".join(items))
-    extra_data_preview.short_description = "اطلاعات اضافی"
+    extra_data_preview.short_description = "more info"
+
+    def formatted_order(self, obj):
+        order = obj.order
+        customer_username = obj.order.customer.user.username
+        return f"Order (ID = {order.id} , Customer = {customer_username})"
+    formatted_order.short_description = "Order"

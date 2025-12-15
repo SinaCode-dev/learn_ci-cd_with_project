@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
-from django.db.models import JSONField
+from django.template.defaultfilters import truncatechars
 
 from decimal import Decimal
 
@@ -35,6 +35,10 @@ class Application(models.Model):
 
     def __str__(self):
         return self.title
+    
+    @property
+    def short_description(self):
+        return truncatechars(self.description, 100)
 
 
 class Discount(models.Model):
@@ -71,6 +75,10 @@ class Service(models.Model):
     
     def get_required_fields(self):
         return self.required_fields.filter(is_required=True).values('field_name', 'field_type', 'label')
+    
+    @property
+    def short_description(self):
+        return truncatechars(self.description, 100)
 
 
 class Comment(models.Model):
@@ -89,6 +97,10 @@ class Comment(models.Model):
     status = models.CharField(max_length=2, choices=COMMENT_STATUS, default=COMMENT_STATUS_WAITING)
     datetime_created = models.DateTimeField(auto_now_add=True)
     datetime_modified = models.DateTimeField(auto_now=True)
+
+    @property
+    def short_body(self):
+        return truncatechars(self.body, 75)
 
 
 class Cart(models.Model):
@@ -127,6 +139,9 @@ class Order(models.Model):
     status = models.CharField(max_length=1, choices=ORDER_STATUS, default=ORDER_STATUS_UNPAID)
     payment_authority = models.CharField(max_length=100, blank=True, null=True)
     payment_ref_id = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return f"Order (ID = {self.id} , Customer = {self.customer.user.username})"
 
 
 class OrderItem(models.Model):
