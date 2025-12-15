@@ -25,6 +25,8 @@ services:
       - redis
     env_file:
       - .env
+    volumes:
+      - ./media:/app/media
 
   celery:
     build: .
@@ -35,6 +37,8 @@ services:
       - backend
     env_file:
       - .env
+    ports:
+      - "5673:5673"
 
 volumes:
   postgres_data:
