@@ -12,7 +12,6 @@ This repository serves as a strong portfolio piece demonstrating full-stack API 
 - [API Endpoints](#api-endpoints)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
-- [License](#license)
 - [Contact](#contact)
 
 ## Features
@@ -186,8 +185,6 @@ For full API documentation, use tools like Swagger (not included, but can be add
 ## Contributing
 Contributions are welcome! Please fork the repo, create a feature branch, and submit a PR. Ensure tests pass (add pytest if needed) and follow PEP8.
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. (Note: Add a LICENSE file if not present.)
 
 ## Contact
 - LinkedIn: [your-linkedin](https://linkedin.com/in/yourname)
