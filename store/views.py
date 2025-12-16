@@ -1,15 +1,16 @@
 from django.core.exceptions import PermissionDenied
 from django.core.cache import cache
 from django.db.models import Prefetch
-from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from django_filters.rest_framework import DjangoFilterBackend
 
 import requests
-import random
+import secrets
+import string
 
 from rest_framework import status
 from rest_framework.decorators import action
@@ -21,6 +22,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet, ModelViewSet, 
 from rest_framework.filters import SearchFilter, OrderingFilter
 
 from kavenegar import KavenegarAPI
+from datetime import timedelta
 
 from .filters import ServiceFilter, OrderFilter
 from .models import Application, Customer, Service, Comment, Cart, CartItem, Order, OrderItem, Discount, ServiceField
@@ -32,7 +34,6 @@ from .tasks import send_sms_task
 
 
 def send_sms(phone, message):
-    try:
         api = KavenegarAPI(settings.KAVENEGAR_API_KEY)
         params = {
             'sender': settings.KAVENEGAR_SENDER,
@@ -40,9 +41,6 @@ def send_sms(phone, message):
             'message': message
         }
         response = api.sms_send(params)
-        print("SMS sent:", response)
-    except Exception as e:
-        print("SMS error:", str(e))
 
 
 class ApplicationViewSet(ModelViewSet):
@@ -251,8 +249,6 @@ class OrderViewSet(ModelViewSet):
         authority = request.query_params.get('Authority')
         status_param = request.query_params.get('Status')
 
-        print("Callback: Authority from URL:", authority)
-        print("Stored Authority in order:", order.payment_authority)
 
         if status_param != 'OK' or order.payment_authority != authority:
             order.status = Order.ORDER_STATUS_CANCELED
@@ -261,7 +257,6 @@ class OrderViewSet(ModelViewSet):
 
         total_price = sum(item.quantity * item.price for item in order.items.all())
         amount = int(total_price * 10)
-        print("Calculated Amount:", amount)
 
         data = {
             "merchant_id": settings.ZARINPAL_MERCHANT_ID,
@@ -272,7 +267,6 @@ class OrderViewSet(ModelViewSet):
         try:
             response = requests.post(settings.ZARINPAL_VERIFY_URL, json=data)
             result = response.json()
-            print("Complete verify response from ZarinPal:", result)
         except Exception as e:
             return Response({'error': f'Error in payment confirmation: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -382,7 +376,7 @@ class CustomerViewSet(GenericViewSet):
         if new_phone:
             if new_phone == customer.phone_number:
                 return Response(serializer.data)
-            code = str(random.randint(100000, 999999))
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
             cache.set(f'pending_phone_{request.user.id}', str(new_phone), 300)
             cache.set(f'phone_verify_{request.user.id}', code, 300)
             send_sms_task.delay(new_phone, f'Your verification code is: {code}')
@@ -417,3 +411,33 @@ class CustomerViewSet(GenericViewSet):
             return Response({'detail': 'Phone number verified and saved successfully.', 'data': customer_serializer.data}, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'Invalid or expired code, or no pending phone number.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['POST'], url_path='resend-otp')
+    def resend_otp(self, request):
+        user_id = request.user.id
+        pending_phone = cache.get(f'pending_phone_{user_id}')
+        if not pending_phone:
+            return Response({'error': 'No pending phone number change. Please initiate a phone change first.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        last_sent_key = f'last_otp_sent_{user_id}'
+        last_sent = cache.get(last_sent_key)
+        if last_sent:
+            time_since_last = timezone.now() - last_sent
+            if time_since_last < timedelta(seconds=60):
+                remaining = 60 - time_since_last.seconds
+                return Response({'error': f'Please wait {remaining} seconds before retrying.', 'remaining_seconds': remaining}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        retry_count_key = f'otp_retry_count_{user_id}'
+        retry_count = cache.get(retry_count_key, 0)
+        if retry_count >= 5:
+            return Response({'error': 'Maximum retry limit reached. Please try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        code = str(secrets.randbelow(900000) + 100000)
+
+        cache.set(f'phone_verify_{user_id}', code, 300)
+        cache.set(last_sent_key, timezone.now(), 3600)
+        cache.set(retry_count_key, retry_count + 1, 3600)
+
+        send_sms_task.delay(pending_phone, f'Your new verification code is: {code}')
+
+        return Response({'detail': 'Verification code resent successfully.'}, status=status.HTTP_200_OK)
