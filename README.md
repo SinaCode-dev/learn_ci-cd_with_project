@@ -52,26 +52,47 @@ This repository serves as a strong portfolio piece demonstrating full-stack API 
 
 #### .env Example
 SECRET_KEY=your-secret-key
+
 DEBUG=True
+
 ALLOWED_HOSTS=127.0.0.1,localhost
+
 POSTGRES_DB=yourdb
+
 POSTGRES_USER=youruser
+
 POSTGRES_PASSWORD=yourpass
+
 POSTGRES_HOST=db
+
 POSTGRES_PORT=5432
+
 ZARINPAL_MERCHANT_ID=your-merchant-id
+
 ZARINPAL_SANDBOX=True
+
 ZARINPAL_REQUEST_URL=https://sandbox.zarinpal.com/pg/services/WebGate/wsdl
+
 ZARINPAL_VERIFY_URL=https://sandbox.zarinpal.com/pg/services/WebGate/wsdl
+
 ZARINPAL_START_PAY_URL=https://sandbox.zarinpal.com/pg/StartPay/
+
 ZARINPAL_CALLBACK_URL=http://localhost:8000/api/orders/pay/callback/
+
 KAVENEGAR_API_KEY=your-kavenegar-key
+
 KAVENEGAR_SENDER=your-sender-number
+
 CELERY_BROKER_URL=redis://redis:6379/0
+
 CELERY_RESULT_BACKEND=redis://redis:6379/0
+
 CELERY_ACCEPT_CONTENT=application/json
+
 CELERY_TASK_SERIALIZER=json
+
 CELERY_RESULT_SERIALIZER=json
+
 CELERY_TIMEZONE=UTC
 
 
