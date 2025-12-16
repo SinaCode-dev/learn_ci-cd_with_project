@@ -30,7 +30,7 @@ This repository serves as a strong portfolio piece demonstrating full-stack API 
 - **Dockerized**: Ready for production with Docker Compose (Postgres, Redis, Celery worker).
 
 ## Tech Stack
-- **Backend**: Django 6.0, Django Rest Framework (DRF)
+- **Backend**: Django 5.0, Django Rest Framework (DRF)
 - **Database**: PostgreSQL (with psycopg2-binary)
 - **Caching & Queues**: Redis (for Celery broker/result backend)
 - **Task Queue**: Celery (for async SMS sending)
