@@ -1,35 +1,43 @@
-name: CI - Builld & Test
-
+name: CI - Build & Test
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
-
 jobs:
   build-test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      
+
+      # گام جدید: ایجاد .env از secrets
+      - name: Create .env file
+        run: |
+          touch .env
+          echo "POSTGRES_DB=resume_db" >> .env  # با healthcheck شما مطابقت دارد -d resume_db
+          echo "POSTGRES_USER=postgres" >> .env  # با healthcheck شما مطابقت دارد -U postgres
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
+          # متغیرهای دیگر را در صورت نیاز اضافه کنید، مثلاً:
+          # echo "DEBUG=True" >> .env
+          # echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          # echo "DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@db:5432/resume_db" >> .env
+
       - name: Build Docker images
         run: docker compose build
-      
+
       - name: Start Services (db, redis, etc.)
         run: docker compose up -d
-      
+
       - name: Wait a bit for services to be ready
-        run: sleep 15
-      
+        run: sleep 15  # اگر لازم بود افزایش دهید، یا از wait بهتر (مثل ابزار wait-on) استفاده کنید
+
       - name: Apply Database Migrations
-        run: docker compose exec -T app python manage.py migrate
-      
+        run: docker compose exec -T backend python manage.py migrate  # 'app' به 'backend' تغییر یافت—تأیید کنید اگر درست است
+
       - name: Run Tests
-        run: docker compose exec -T app python manage.py test || true
+        run: docker compose exec -T backend python manage.py test || true  # 'app' به 'backend' تغییر یافت
 
       - name: Stop & cleanup
         if: always()
-        run: docker compose down -v 
+        run: docker compose down -v
