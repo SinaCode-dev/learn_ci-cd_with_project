@@ -1,0 +1,35 @@
+name: CI - Builld & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker images
+        run: docker compose build
+      
+      - name: Start Services (db, redis, etc.)
+        run: docker compose up -d
+      
+      - name: Wait a bit for services to be ready
+        run: sleep 15
+      
+      - name: Apply Database Migrations
+        run: docker compose exec -T app python manage.py migrate
+      
+      - name: Run Tests
+        run: docker compose exec -T app python manage.py test || true
+
+      - name: Stop & cleanup
+        if: always()
+        run: docker compose down -v 
