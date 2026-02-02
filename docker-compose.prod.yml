@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgres:16
+    env_file:
+      - .env.prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$    {POSTGRES_USER} -d     $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: .
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env.prod
+    volumes:
+      - ./media:/app/media
+    environment:
+      ENV_MODE: prod
+
+  celery:
+    build: .
+    command: celery -A config worker --loglevel=info
+    depends_on:
+      - db
+      - redis
+      - backend
+    env_file:
+      - .env.prod
+    ports:
+      - "5673:5673"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - POSTGRES_ENGINE=${POSTGRES_ENGINE}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - ZARINPAL_MERCHANT_ID=${ZARINPAL_MERCHANT_ID}
+      - ZARINPAL_SANDBOX=${ZARINPAL_SANDBOX}
+      - ZARINPAL_REQUEST_URL=${ZARINPAL_REQUEST_URL}
+      - ZARINPAL_VERIFY_URL=${ZARINPAL_VERIFY_URL}
+      - ZARINPAL_START_PAY_URL=${ZARINPAL_START_PAY_URL}
+      - ZARINPAL_CALLBACK_URL=${ZARINPAL_CALLBACK_URL}
+      - KAVENEGAR_API_KEY=${KAVENEGAR_API_KEY}
+      - KAVENEGAR_SENDER=${KAVENEGAR_SENDER}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - CELERY_ACCEPT_CONTENT=${CELERY_ACCEPT_CONTENT}
+      - CELERY_TASK_SERIALIZER=${CELERY_TASK_SERIALIZER}
+      - CELERY_RESULT_SERIALIZER=${CELERY_RESULT_SERIALIZER}
+      - CELERY_TIMEZONE=${CELERY_TIMEZONE}
+
+volumes:
+  postgres_data:

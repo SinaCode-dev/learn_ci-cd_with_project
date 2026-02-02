@@ -9,4 +9,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8000
 RUN mkdir -p /app/media && chown -R app:app /app/media
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+USER app
+CMD ["sh", "-c", "if [ \"$ENV_MODE\" = \"prod\" ]; then gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3; else python manage.py runserver 0.0.0.0:8000; fi"]

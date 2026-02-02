@@ -15,6 +15,15 @@ from pathlib import Path
 import environ
 import os
 
+ENV_MODE = os.environ.get('ENV_MODE', 'dev')
+
+if ENV_MODE == "prod":
+    DEBUG = False
+    ALLOWED_HOSTS = ['*']
+else:
+    DEBUG = True
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),

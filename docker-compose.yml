@@ -10,16 +10,22 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-d", "resume_db", "-U", "postgres"]
-      interval: 30s
-      timeout: 60s
+      test: ["CMD-SHELL", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]  # variable کردم تا با .env match کنه
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 80s
+      start_period: 20s  # کمتر برای CI
 
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   backend:
     build: .
@@ -27,8 +33,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -38,9 +46,12 @@ services:
     build: .
     command: celery -A config worker --loglevel=info
     depends_on:
-      - db
-      - redis
-      - backend
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started  # برای backend فقط started کافیه
     env_file:
       - .env
     ports:

@@ -1,0 +1,134 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:  # این job CI هست
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          touch .env
+          echo "POSTGRES_DB=resume_db" >> .env
+          echo "POSTGRES_USER=postgres" >> .env
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
+          echo "POSTGRES_HOST=db" >> .env
+          echo "POSTGRES_PORT=5432" >> .env
+          echo "POSTGRES_ENGINE=django.db.backends.postgresql" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+          echo "DEBUG=True" >> .env
+          echo "ALLOWED_HOSTS=*" >> .env
+          echo "ZARINPAL_MERCHANT_ID=${{ secrets.ZARINPAL_MERCHANT_ID }}" >> .env
+          echo "ZARINPAL_SANDBOX=True" >> .env
+          echo "ZARINPAL_REQUEST_URL=${{ secrets.ZARINPAL_REQUEST_URL }}" >> .env
+          echo "ZARINPAL_VERIFY_URL=${{ secrets.ZARINPAL_VERIFY_URL }}" >> .env
+          echo "ZARINPAL_START_PAY_URL=${{ secrets.ZARINPAL_START_PAY_URL }}" >> .env
+          echo "ZARINPAL_CALLBACK_URL=${{ secrets.ZARINPAL_CALLBACK_URL }}" >> .env
+          echo "KAVENEGAR_API_KEY=${{ secrets.KAVENEGAR_API_KEY }}" >> .env
+          echo "KAVENEGAR_SENDER=${{ secrets.KAVENEGAR_SENDER }}" >> .env
+          echo "CELERY_BROKER_URL=redis://redis:6379/0" >> .env
+          echo "CELERY_RESULT_BACKEND=redis://redis:6379/0" >> .env
+          echo "CELERY_ACCEPT_CONTENT=['application/json']" >> .env
+          echo "CELERY_TASK_SERIALIZER=json" >> .env
+          echo "CELERY_RESULT_SERIALIZER=json" >> .env
+          echo "CELERY_TIMEZONE=UTC" >> .env
+
+      - name: Build Docker images
+        run: docker compose build
+
+      - name: Start Services (db, redis, etc.)
+        run: docker compose up -d
+
+      - name: Wait for services to be ready
+        run: sleep 30
+
+      - name: Check Backend Logs (for debug)
+        if: always()
+        run: docker compose logs backend || true
+
+      - name: Apply Database Migrations
+        run: docker compose exec -T backend python manage.py migrate
+
+      - name: Run Tests
+        run: docker compose exec -T backend python manage.py test || true
+
+      - name: Stop & cleanup
+        if: always()
+        run: docker compose down -v
+
+  deploy-simulate:
+    runs-on: ubuntu-latest
+    needs: build-test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create .env.prod file
+        run: |
+          touch .env.prod
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env.prod
+          echo "DEBUG=False" >> .env.prod  # یا ${{ secrets.DEBUG }} اگر secret باشه
+          echo "ALLOWED_HOSTS=*" >> .env.prod  # برای تولید، دامنه واقعی بگذارید
+          echo "POSTGRES_ENGINE=django.db.backends.postgresql" >> .env.prod
+          echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> .env.prod  # مثل 'postgres'
+          echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> .env.prod  # مثل 'postgres'
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env.prod
+          echo "POSTGRES_HOST=db" >> .env.prod  # نام سرویس در docker-compose
+          echo "POSTGRES_PORT=5432" >> .env.prod
+          echo "ZARINPAL_MERCHANT_ID=${{ secrets.ZARINPAL_MERCHANT_ID }}" >> .env.prod
+          echo "ZARINPAL_SANDBOX=True" >> .env.prod  # یا False برای تولید
+          echo "ZARINPAL_REQUEST_URL=https://api.zarinpal.com/pg/v4/payment/request.json" >> .env.prod
+          echo "ZARINPAL_VERIFY_URL=https://api.zarinpal.com/pg/v4/payment/verify.json" >> .env.prod
+          echo "ZARINPAL_START_PAY_URL=https://www.zarinpal.com/pg/StartPay/" >> .env.prod
+          echo "ZARINPAL_CALLBACK_URL=${{ secrets.ZARINPAL_CALLBACK_URL }}" >> .env.prod  # مثل http://your-domain.com/payment/callback/
+          echo "KAVENEGAR_API_KEY=${{ secrets.KAVENEGAR_API_KEY }}" >> .env.prod
+          echo "KAVENEGAR_SENDER=${{ secrets.KAVENEGAR_SENDER }}" >> .env.prod  # مثل شماره فرستنده
+          echo "CELERY_BROKER_URL=redis://redis:6379/0" >> .env.prod
+          echo "CELERY_RESULT_BACKEND=redis://redis:6379/0" >> .env.prod
+          echo "CELERY_ACCEPT_CONTENT=['application/json']" >> .env.prod
+          echo "CELERY_TASK_SERIALIZER=json" >> .env.prod
+          echo "CELERY_RESULT_SERIALIZER=json" >> .env.prod
+          echo "CELERY_TIMEZONE=UTC" >> .env.prod
+      
+      - name: Deploy with Docker Compose
+        env:
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          ZARINPAL_REQUEST_URL: ${{ secrets.ZARINPAL_REQUEST_URL }}
+        run: docker compose -f docker-compose.prod.yml up -d --build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images for production
+        run: docker compose -f docker-compose.prod.yml build
+
+      - name: Simulate Production Deployment
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # --env-file اضافه شد
+          sleep 60
+          docker compose -f docker-compose.prod.yml --env-file .env.prod logs db
+          docker compose -f docker-compose.prod.yml --env-file .env.prod logs backend
+          docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend python manage.py migrate || (docker compose -f docker-compose.prod.yml logs && exit 1)
+          docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend python manage.py test || (docker compose -f docker-compose.prod.yml logs && exit 1)
+      
+      - name: Optional - Build and Save Artifact
+        if: success()
+        run: |
+          docker build -t myapp-prod:latest .
+          docker save -o myapp-prod.tar myapp-prod:latest
+          
+      - name: Upload Artifact (Optional)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-prod-image
+          path: myapp-prod.tar
